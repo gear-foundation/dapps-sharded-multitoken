@@ -4,16 +4,16 @@
   </a>
 </p>
 
-# Gear Template App
+# Sharded Multitoken
 
 [![Build][build_badge]][build_href]
 [![License][lic_badge]][lic_href]
 
-[build_badge]: https://github.com/gear-dapps/app/workflows/Build/badge.svg
-[build_href]: https://github.com/gear-dapps/app/actions/workflows/build.yml
+[build_badge]: https://github.com/gear-dapps/sharded-multitoken/workflows/Build/badge.svg
+[build_href]: https://github.com/gear-dapps/sharded-multitoken/actions/workflows/build.yml
 
 [lic_badge]: https://img.shields.io/badge/License-MIT-success
-[lic_href]: https://github.com/gear-dapps/app/blob/master/LICENSE
+[lic_href]: https://github.com/gear-dapps/sharded-multitoken/blob/master/LICENSE
 
 <!-- Description starts here -->
 
