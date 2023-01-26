@@ -88,6 +88,24 @@ pub async fn get_token_owner(storage_id: &ActorId, token_id: u128) -> Result<Act
     }
 }
 
+pub async fn get_token_supply(storage_id: &ActorId, token_id: u128) -> Result<u128, ()> {
+    let result = msg::send_for_reply_as::<_, MTStorageEvent>(
+        *storage_id,
+        MTStorageAction::GetTokenSupply(token_id),
+        0,
+    )
+    .expect("Error in sending a message `MTStorageAction::GetTokenSupply`")
+    .await;
+
+    match result {
+        Ok(storage_event) => match storage_event {
+            MTStorageEvent::TokenSupply(supply) => Ok(supply),
+            _ => Err(()),
+        },
+        Err(_) => Err(()),
+    }
+}
+
 pub async fn get_name(storage_id: &ActorId) -> Result<String, ()> {
     let result =
         msg::send_for_reply_as::<_, MTStorageEvent>(*storage_id, MTStorageAction::GetName, 0)
@@ -155,6 +173,66 @@ pub async fn transfer(
         0,
     )
     .expect("Error in sending a message `MTStorageAction::Transfer`")
+    .await;
+
+    match result {
+        Ok(storage_event) => match storage_event {
+            MTStorageEvent::Ok => Ok(()),
+            _ => Err(()),
+        },
+        Err(_) => Err(()),
+    }
+}
+
+pub async fn mint(
+    storage_id: &ActorId,
+    transaction_hash: H256,
+    msg_source: &ActorId,
+    ids: &Vec<u128>,
+    amounts: &Vec<u128>,
+    meta: &Vec<Option<TokenMetadata>>,
+) -> Result<(), ()> {
+    let result = msg::send_for_reply_as::<_, MTStorageEvent>(
+        *storage_id,
+        MTStorageAction::Mint {
+            transaction_hash,
+            msg_source: *msg_source,
+            ids: ids.clone(),
+            amounts: amounts.clone(),
+            meta: meta.clone(),
+        },
+        0,
+    )
+    .expect("Error in sending a message `MTStorageAction::Mint`")
+    .await;
+
+    match result {
+        Ok(storage_event) => match storage_event {
+            MTStorageEvent::Ok => Ok(()),
+            _ => Err(()),
+        },
+        Err(_) => Err(()),
+    }
+}
+
+pub async fn burn(
+    storage_id: &ActorId,
+    transaction_hash: H256,
+    msg_source: &ActorId,
+    ids: &Vec<u128>,
+    amounts: &Vec<u128>,
+) -> Result<(), ()> {
+    let result = msg::send_for_reply_as::<_, MTStorageEvent>(
+        *storage_id,
+        MTStorageAction::Burn {
+            transaction_hash,
+            msg_source: *msg_source,
+            ids: ids.clone(),
+            amounts: amounts.clone(),
+        },
+        0,
+    )
+    .expect("Error in sending a message `MTStorageAction::Burn`")
     .await;
 
     match result {

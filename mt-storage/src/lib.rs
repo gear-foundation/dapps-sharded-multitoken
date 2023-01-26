@@ -64,6 +64,14 @@ impl MTStorage {
         *self.owners.get(&token_id).expect("Unable to locate token.")
     }
 
+    fn get_token_supply(&self, token_id: TokenId) -> u128 {
+        self.balances
+            .get(&token_id)
+            .expect("Invalid token id!")
+            .values()
+            .sum()
+    }
+
     fn assert_mt_contract(&self) {
         assert!(
             msg::source() == self.mt_logic_id,
@@ -71,8 +79,113 @@ impl MTStorage {
         )
     }
 
+    fn assert_can_burn(&self, owner: &ActorId, id: &TokenId, amount: u128) {
+        if self.get_balance(*id, owner) < amount {
+            panic!("Not enough balance!");
+        }
+    }
+
     fn clear_transaction(&mut self, transaction_hash: H256) {
         self.transaction_status.remove(&transaction_hash);
+    }
+
+    fn mint(
+        &mut self,
+        transaction_hash: H256,
+        msg_source: &ActorId,
+        ids: &Vec<TokenId>,
+        amounts: &Vec<u128>,
+        meta: Vec<Option<TokenMetadata>>,
+    ) {
+        self.assert_mt_contract();
+
+        if let Some(status) = self.transaction_status.get(&transaction_hash) {
+            match status {
+                true => reply_ok(),
+                false => reply_err(),
+            };
+            return;
+        }
+
+        send_delayed_clear(transaction_hash);
+
+        // Actual business logic
+        if ids.len() != amounts.len() || msg_source.is_zero() {
+            reply_err();
+            return;
+        }
+
+        for (i, maybe_meta) in meta.iter().enumerate() {
+            let id = ids[i];
+            let amount = amounts[i];
+
+            if let Some(meta) = maybe_meta {
+                if amount > 1 {
+                    panic!("Can't mint metadata to a fungible token!");
+                }
+
+                self.token_metadata.insert(id, meta.clone());
+                self.owners.insert(id, *msg_source);
+            }
+
+            let prev_balance = self.get_balance(id, msg_source);
+            let new_balance = prev_balance.checked_add(amount).expect("Math overflow!");
+
+            // Update balance
+            self.balances
+                .entry(id)
+                .or_default()
+                .insert(*msg_source, new_balance);
+        }
+
+        reply_ok();
+    }
+
+    fn burn(
+        &mut self,
+        transaction_hash: H256,
+        msg_source: &ActorId,
+        ids: &Vec<TokenId>,
+        amounts: &Vec<u128>,
+    ) {
+        self.assert_mt_contract();
+
+        if let Some(status) = self.transaction_status.get(&transaction_hash) {
+            match status {
+                true => reply_ok(),
+                false => reply_err(),
+            };
+            return;
+        }
+
+        send_delayed_clear(transaction_hash);
+
+        // Actual business logic
+        if ids.len() != amounts.len() {
+            reply_err();
+            return;
+        }
+
+        for (id, amount) in ids.iter().zip(amounts.clone()) {
+            self.assert_can_burn(msg_source, id, amount);
+        }
+
+        for (i, id) in ids.iter().enumerate() {
+            let amount = amounts[i];
+            self.owners.remove(id);
+
+            // Update balance
+            let new_balance = self
+                .get_balance(*id, msg_source)
+                .checked_sub(amount)
+                .expect("Math overflow!");
+            self.balances
+                .entry(*id)
+                .or_default()
+                .insert(*msg_source, new_balance);
+        }
+
+        reply_ok();
     }
 
     fn transfer(
@@ -163,11 +276,9 @@ impl MTStorage {
 
         if let Some(token) = self.balances.get_mut(&token_id) {
             if let Some(balance) = token.get_mut(sender) {
-                if *balance >= amount {
-                    if msg_source == sender || approved {
-                        *balance = balance.checked_sub(amount).expect("Math overflow.");
-                        return true;
-                    }
+                if *balance >= amount && (msg_source == sender || approved) {
+                    *balance = balance.checked_sub(amount).expect("Math overflow.");
+                    return true;
                 }
             }
         }
@@ -244,6 +355,7 @@ impl MTStorage {
 unsafe extern "C" fn handle() {
     let action: MTStorageAction = msg::load().expect("Unable to load `MTStorageAction`.");
     let storage: &mut MTStorage = MT_STORAGE.get_or_insert(Default::default());
+
     match action {
         MTStorageAction::GetBalance { token_id, account } => {
             msg::reply(
@@ -276,6 +388,13 @@ unsafe extern "C" fn handle() {
             )
             .expect("Unable to reply.");
         }
+        MTStorageAction::GetTokenSupply(token_id) => {
+            msg::reply(
+                MTStorageEvent::TokenSupply(storage.get_token_supply(token_id)),
+                0,
+            )
+            .expect("Unable to reply.");
+        }
         MTStorageAction::GetName => {
             msg::reply(MTStorageEvent::Name(storage.get_name()), 0).expect("Unable to reply.");
         }
@@ -303,6 +422,19 @@ unsafe extern "C" fn handle() {
                 amount,
             );
         }
+        MTStorageAction::Mint {
+            transaction_hash,
+            msg_source,
+            ids,
+            amounts,
+            meta,
+        } => storage.mint(transaction_hash, &msg_source, &ids, &amounts, meta),
+        MTStorageAction::Burn {
+            transaction_hash,
+            msg_source,
+            ids,
+            amounts,
+        } => storage.burn(transaction_hash, &msg_source, &ids, &amounts),
         MTStorageAction::Approve {
             transaction_hash,
             msg_source,
@@ -362,11 +494,15 @@ unsafe extern "C" fn meta_state() -> *mut [i32; 2] {
         MTStorageState::GetTokenOwner(token_id) => {
             MTStorageStateReply::TokenOwner(storage.get_token_owner(token_id))
         }
+        MTStorageState::GetTokenSupply(token_id) => {
+            MTStorageStateReply::TokenSupply(storage.get_token_supply(token_id))
+        }
         MTStorageState::GetName => MTStorageStateReply::Name(storage.get_name()),
         MTStorageState::GetSymbol => MTStorageStateReply::Symbol(storage.get_symbol()),
         MTStorageState::GetBaseURI => MTStorageStateReply::BaseURI(storage.get_base_uri()),
     }
     .encode();
+
     gstd::util::to_leak_ptr(encoded)
 }
 

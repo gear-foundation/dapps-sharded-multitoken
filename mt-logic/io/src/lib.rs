@@ -1,6 +1,7 @@
 #![no_std]
 
 use gstd::{prelude::*, ActorId, Decode, Encode, TypeInfo};
+use mt_storage_io::TokenMetadata;
 use primitive_types::H256;
 
 #[derive(Debug, Encode, Decode, TypeInfo, Clone)]
@@ -31,13 +32,22 @@ pub enum MTLogicEvent {
     Approval(bool),
 }
 
-#[derive(Encode, Debug, Decode, TypeInfo, Copy, Clone)]
+#[derive(Encode, Debug, Decode, TypeInfo, Clone)]
 pub enum Action {
     Transfer {
         token_id: u128,
         sender: ActorId,
         recipient: ActorId,
         amount: u128,
+    },
+    Mint {
+        ids: Vec<u128>,
+        amounts: Vec<u128>,
+        meta: Vec<Option<TokenMetadata>>,
+    },
+    Burn {
+        ids: Vec<u128>,
+        amounts: Vec<u128>,
     },
     Approve {
         account: ActorId,

@@ -8,6 +8,7 @@ use hashbrown::HashMap;
 use instruction::*;
 use messages::*;
 use mt_logic_io::*;
+use mt_storage_io::TokenMetadata;
 use primitive_types::H256;
 
 const GAS_STORAGE_CREATION: u64 = 3_000_000_000;
@@ -64,18 +65,26 @@ impl MTLogic {
                         self.transfer(
                             transaction_hash,
                             token_id,
-                            &msg_source,
+                            msg_source,
                             &sender,
                             &recipient,
                             amount,
                         )
                         .await
                     }
+                    Action::Mint { ids, amounts, meta } => {
+                        self.mint(transaction_hash, msg_source, &ids, &amounts, &meta)
+                            .await
+                    }
+                    Action::Burn { ids, amounts } => {
+                        self.burn(transaction_hash, msg_source, &ids, &amounts)
+                            .await
+                    }
                     Action::Approve {
                         account,
                         is_approved,
                     } => {
-                        self.approve(transaction_hash, &msg_source, &account, is_approved)
+                        self.approve(transaction_hash, msg_source, &account, is_approved)
                             .await
                     }
                 }
@@ -117,7 +126,7 @@ impl MTLogic {
                     transaction_hash,
                     &sender_storage_id,
                     token_id,
-                    &msg_source,
+                    msg_source,
                     sender,
                     amount,
                 );
@@ -223,6 +232,69 @@ impl MTLogic {
         }
     }
 
+    async fn mint(
+        &mut self,
+        transaction_hash: H256,
+        msg_source: &ActorId,
+        ids: &Vec<u128>,
+        amounts: &Vec<u128>,
+        meta: &Vec<Option<TokenMetadata>>,
+    ) {
+        self.transaction_status
+            .insert(transaction_hash, TransactionStatus::InProgress);
+        let storage_id = self.get_or_create_storage_address(msg_source);
+
+        let result = mint(
+            &storage_id,
+            transaction_hash,
+            msg_source,
+            ids,
+            amounts,
+            meta,
+        )
+        .await;
+
+        match result {
+            Ok(()) => {
+                self.transaction_status
+                    .insert(transaction_hash, TransactionStatus::Success);
+                reply_ok();
+            }
+            Err(()) => {
+                self.transaction_status
+                    .insert(transaction_hash, TransactionStatus::Failure);
+                reply_err();
+            }
+        }
+    }
+
+    async fn burn(
+        &mut self,
+        transaction_hash: H256,
+        msg_source: &ActorId,
+        ids: &Vec<u128>,
+        amounts: &Vec<u128>,
+    ) {
+        self.transaction_status
+            .insert(transaction_hash, TransactionStatus::InProgress);
+        let storage_id = self.get_or_create_storage_address(msg_source);
+
+        let result = burn(&storage_id, transaction_hash, msg_source, ids, amounts).await;
+
+        match result {
+            Ok(()) => {
+                self.transaction_status
+                    .insert(transaction_hash, TransactionStatus::Success);
+                reply_ok();
+            }
+            Err(()) => {
+                self.transaction_status
+                    .insert(transaction_hash, TransactionStatus::Failure);
+                reply_err();
+            }
+        }
+    }
+
     fn clear(&mut self, transaction_hash: H256) {
         self.transaction_status.remove(&transaction_hash);
     }
@@ -267,6 +339,7 @@ impl MTLogic {
         }
     }
 
+    /// TODO: Implement all storage getters.
     async fn get_approval(&self, account: &ActorId, approval_target: &ActorId) {
         let encoded = hex::encode(account.as_ref());
         let id: String = encoded.chars().next().expect("Can't be None").to_string();

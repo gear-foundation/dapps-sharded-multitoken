@@ -13,7 +13,7 @@ pub struct TokenMetadata {
     pub reference: Option<String>,
 }
 
-#[derive(Encode, Decode, Debug, Copy, Clone, TypeInfo)]
+#[derive(Encode, Decode, Debug, Clone, TypeInfo)]
 pub enum MTStorageAction {
     GetBalance {
         token_id: TokenId,
@@ -25,6 +25,7 @@ pub enum MTStorageAction {
     },
     GetTokenMetadata(TokenId),
     GetTokenOwner(TokenId),
+    GetTokenSupply(TokenId),
     GetName,
     GetSymbol,
     GetBaseURI,
@@ -35,6 +36,19 @@ pub enum MTStorageAction {
         sender: ActorId,
         recipient: ActorId,
         amount: u128,
+    },
+    Mint {
+        transaction_hash: H256,
+        msg_source: ActorId,
+        ids: Vec<TokenId>,
+        amounts: Vec<u128>,
+        meta: Vec<Option<TokenMetadata>>,
+    },
+    Burn {
+        transaction_hash: H256,
+        msg_source: ActorId,
+        ids: Vec<TokenId>,
+        amounts: Vec<u128>,
     },
     Approve {
         transaction_hash: H256,
@@ -66,6 +80,7 @@ pub enum MTStorageEvent {
     Approval(bool),
     TokenMetadata(TokenMetadata),
     TokenOwner(ActorId),
+    TokenSupply(u128),
     Name(String),
     Symbol(String),
     BaseURI(String),
@@ -83,6 +98,7 @@ pub enum MTStorageState {
     },
     GetTokenMetadata(TokenId),
     GetTokenOwner(TokenId),
+    GetTokenSupply(TokenId),
     GetName,
     GetSymbol,
     GetBaseURI,
@@ -94,6 +110,7 @@ pub enum MTStorageStateReply {
     Approval(bool),
     TokenMetadata(TokenMetadata),
     TokenOwner(ActorId),
+    TokenSupply(u128),
     Name(String),
     Symbol(String),
     BaseURI(String),
