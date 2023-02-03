@@ -24,8 +24,8 @@ pre-commit: fmt lint full-test
 
 test:
 	@echo ⚙️ Running unit tests...
-	@cargo +nightly t -Fbinary-vendor
+	@cargo +nightly t
 
 full-test:
 	@echo ⚙️ Running all tests...
-	@cargo +nightly t -Fbinary-vendor -- --include-ignored
+	@cargo +nightly t -- --include-ignored

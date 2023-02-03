@@ -5,14 +5,6 @@ use primitive_types::H256;
 
 pub type TokenId = u128;
 
-#[derive(Debug, Decode, Encode, TypeInfo, Default, Clone, PartialEq, Eq)]
-pub struct TokenMetadata {
-    pub title: Option<String>,
-    pub description: Option<String>,
-    pub media: Option<String>,
-    pub reference: Option<String>,
-}
-
 #[derive(Encode, Decode, Debug, Clone, TypeInfo)]
 pub enum MTStorageAction {
     GetBalance {
@@ -23,12 +15,6 @@ pub enum MTStorageAction {
         account: ActorId,
         approval_target: ActorId,
     },
-    GetTokenMetadata(TokenId),
-    GetTokenOwner(TokenId),
-    GetTokenSupply(TokenId),
-    GetName,
-    GetSymbol,
-    GetBaseURI,
     Transfer {
         transaction_hash: H256,
         token_id: TokenId,
@@ -36,19 +22,6 @@ pub enum MTStorageAction {
         sender: ActorId,
         recipient: ActorId,
         amount: u128,
-    },
-    Mint {
-        transaction_hash: H256,
-        msg_source: ActorId,
-        ids: Vec<TokenId>,
-        amounts: Vec<u128>,
-        meta: Vec<Option<TokenMetadata>>,
-    },
-    Burn {
-        transaction_hash: H256,
-        msg_source: ActorId,
-        ids: Vec<TokenId>,
-        amounts: Vec<u128>,
     },
     Approve {
         transaction_hash: H256,
@@ -78,12 +51,6 @@ pub enum MTStorageEvent {
     Err,
     Balance(u128),
     Approval(bool),
-    TokenMetadata(TokenMetadata),
-    TokenOwner(ActorId),
-    TokenSupply(u128),
-    Name(String),
-    Symbol(String),
-    BaseURI(String),
 }
 
 #[derive(Encode, Decode, TypeInfo)]
@@ -96,22 +63,10 @@ pub enum MTStorageState {
         account: ActorId,
         approval_target: ActorId,
     },
-    GetTokenMetadata(TokenId),
-    GetTokenOwner(TokenId),
-    GetTokenSupply(TokenId),
-    GetName,
-    GetSymbol,
-    GetBaseURI,
 }
 
 #[derive(Encode, Decode, Debug, TypeInfo)]
 pub enum MTStorageStateReply {
     Balance(u128),
     Approval(bool),
-    TokenMetadata(TokenMetadata),
-    TokenOwner(ActorId),
-    TokenSupply(u128),
-    Name(String),
-    Symbol(String),
-    BaseURI(String),
 }

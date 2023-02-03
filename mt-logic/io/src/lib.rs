@@ -1,7 +1,7 @@
 #![no_std]
 
 use gstd::{prelude::*, ActorId, Decode, Encode, TypeInfo};
-use mt_storage_io::TokenMetadata;
+pub use mt_storage_io::TokenId;
 use primitive_types::H256;
 
 #[derive(Debug, Encode, Decode, TypeInfo, Clone)]
@@ -40,18 +40,23 @@ pub enum Action {
         recipient: ActorId,
         amount: u128,
     },
-    Mint {
-        ids: Vec<u128>,
-        amounts: Vec<u128>,
-        meta: Vec<Option<TokenMetadata>>,
-    },
-    Burn {
-        ids: Vec<u128>,
-        amounts: Vec<u128>,
-    },
     Approve {
         account: ActorId,
         is_approved: bool,
+    },
+    Create {
+        initial_amount: u128,
+        uri: String,
+    },
+    MintBatch {
+        token_id: TokenId,
+        to: Vec<ActorId>,
+        amounts: Vec<u128>,
+    },
+    BurnBatch {
+        token_id: TokenId,
+        burn_from: Vec<ActorId>,
+        amounts: Vec<u128>,
     },
 }
 
@@ -64,9 +69,17 @@ pub struct InitMTLogic {
 #[derive(Encode, Debug, Decode, TypeInfo)]
 pub enum MTLogicState {
     Storages,
+    GetTokenNonce,
+    GetTokenURI(TokenId),
+    GetTokenTotalSupply(TokenId),
+    GetTokenOwner(TokenId),
 }
 
 #[derive(Encode, Debug, Decode, TypeInfo)]
 pub enum MTLogicStateReply {
     Storages(Vec<(String, ActorId)>),
+    TokenNonce(TokenId),
+    TokenURI(String),
+    TokenTotalSupply(u128),
+    TokenOwner(ActorId),
 }

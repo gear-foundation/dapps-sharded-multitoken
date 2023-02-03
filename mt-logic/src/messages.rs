@@ -1,5 +1,5 @@
 use gstd::{msg, prelude::*, ActorId};
-use mt_storage_io::{MTStorageAction, MTStorageEvent, TokenMetadata};
+use mt_storage_io::{MTStorageAction, MTStorageEvent};
 use primitive_types::H256;
 
 pub async fn get_balance(
@@ -52,105 +52,6 @@ pub async fn get_approval(
     }
 }
 
-pub async fn get_token_metadata(storage_id: &ActorId, token_id: u128) -> Result<TokenMetadata, ()> {
-    let result = msg::send_for_reply_as::<_, MTStorageEvent>(
-        *storage_id,
-        MTStorageAction::GetTokenMetadata(token_id),
-        0,
-    )
-    .expect("Error in sending a message `MTStorageAction::GetTokenMetadata`")
-    .await;
-
-    match result {
-        Ok(storage_event) => match storage_event {
-            MTStorageEvent::TokenMetadata(token_metadata) => Ok(token_metadata),
-            _ => Err(()),
-        },
-        Err(_) => Err(()),
-    }
-}
-
-pub async fn get_token_owner(storage_id: &ActorId, token_id: u128) -> Result<ActorId, ()> {
-    let result = msg::send_for_reply_as::<_, MTStorageEvent>(
-        *storage_id,
-        MTStorageAction::GetTokenOwner(token_id),
-        0,
-    )
-    .expect("Error in sending a message `MTStorageAction::GetTokenOwner`")
-    .await;
-
-    match result {
-        Ok(storage_event) => match storage_event {
-            MTStorageEvent::TokenOwner(owner) => Ok(owner),
-            _ => Err(()),
-        },
-        Err(_) => Err(()),
-    }
-}
-
-pub async fn get_token_supply(storage_id: &ActorId, token_id: u128) -> Result<u128, ()> {
-    let result = msg::send_for_reply_as::<_, MTStorageEvent>(
-        *storage_id,
-        MTStorageAction::GetTokenSupply(token_id),
-        0,
-    )
-    .expect("Error in sending a message `MTStorageAction::GetTokenSupply`")
-    .await;
-
-    match result {
-        Ok(storage_event) => match storage_event {
-            MTStorageEvent::TokenSupply(supply) => Ok(supply),
-            _ => Err(()),
-        },
-        Err(_) => Err(()),
-    }
-}
-
-pub async fn get_name(storage_id: &ActorId) -> Result<String, ()> {
-    let result =
-        msg::send_for_reply_as::<_, MTStorageEvent>(*storage_id, MTStorageAction::GetName, 0)
-            .expect("Error in sending a message `MTStorageAction::GetName`")
-            .await;
-
-    match result {
-        Ok(storage_event) => match storage_event {
-            MTStorageEvent::Name(name) => Ok(name),
-            _ => Err(()),
-        },
-        Err(_) => Err(()),
-    }
-}
-
-pub async fn get_symbol(storage_id: &ActorId) -> Result<String, ()> {
-    let result =
-        msg::send_for_reply_as::<_, MTStorageEvent>(*storage_id, MTStorageAction::GetSymbol, 0)
-            .expect("Error in sending a message `MTStorageAction::GetSymbol`")
-            .await;
-
-    match result {
-        Ok(storage_event) => match storage_event {
-            MTStorageEvent::Symbol(symbol) => Ok(symbol),
-            _ => Err(()),
-        },
-        Err(_) => Err(()),
-    }
-}
-
-pub async fn get_base_uri(storage_id: &ActorId) -> Result<String, ()> {
-    let result =
-        msg::send_for_reply_as::<_, MTStorageEvent>(*storage_id, MTStorageAction::GetBaseURI, 0)
-            .expect("Error in sending a message `MTStorageAction::GetBaseURI`")
-            .await;
-
-    match result {
-        Ok(storage_event) => match storage_event {
-            MTStorageEvent::BaseURI(uri) => Ok(uri),
-            _ => Err(()),
-        },
-        Err(_) => Err(()),
-    }
-}
-
 pub async fn transfer(
     storage_id: &ActorId,
     transaction_hash: H256,
@@ -173,66 +74,6 @@ pub async fn transfer(
         0,
     )
     .expect("Error in sending a message `MTStorageAction::Transfer`")
-    .await;
-
-    match result {
-        Ok(storage_event) => match storage_event {
-            MTStorageEvent::Ok => Ok(()),
-            _ => Err(()),
-        },
-        Err(_) => Err(()),
-    }
-}
-
-pub async fn mint(
-    storage_id: &ActorId,
-    transaction_hash: H256,
-    msg_source: &ActorId,
-    ids: &Vec<u128>,
-    amounts: &Vec<u128>,
-    meta: &Vec<Option<TokenMetadata>>,
-) -> Result<(), ()> {
-    let result = msg::send_for_reply_as::<_, MTStorageEvent>(
-        *storage_id,
-        MTStorageAction::Mint {
-            transaction_hash,
-            msg_source: *msg_source,
-            ids: ids.clone(),
-            amounts: amounts.clone(),
-            meta: meta.clone(),
-        },
-        0,
-    )
-    .expect("Error in sending a message `MTStorageAction::Mint`")
-    .await;
-
-    match result {
-        Ok(storage_event) => match storage_event {
-            MTStorageEvent::Ok => Ok(()),
-            _ => Err(()),
-        },
-        Err(_) => Err(()),
-    }
-}
-
-pub async fn burn(
-    storage_id: &ActorId,
-    transaction_hash: H256,
-    msg_source: &ActorId,
-    ids: &Vec<u128>,
-    amounts: &Vec<u128>,
-) -> Result<(), ()> {
-    let result = msg::send_for_reply_as::<_, MTStorageEvent>(
-        *storage_id,
-        MTStorageAction::Burn {
-            transaction_hash,
-            msg_source: *msg_source,
-            ids: ids.clone(),
-            amounts: amounts.clone(),
-        },
-        0,
-    )
-    .expect("Error in sending a message `MTStorageAction::Burn`")
     .await;
 
     match result {
@@ -273,6 +114,7 @@ pub async fn approve(
     }
 }
 
+#[allow(unused)]
 pub async fn increase_balance(
     transaction_hash: H256,
     storage_id: &ActorId,
@@ -302,6 +144,7 @@ pub async fn increase_balance(
     }
 }
 
+#[allow(unused)]
 pub async fn decrease_balance(
     transaction_hash: H256,
     storage_id: &ActorId,

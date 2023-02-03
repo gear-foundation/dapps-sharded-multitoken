@@ -8,7 +8,7 @@ use hashbrown::HashMap;
 use instruction::*;
 use messages::*;
 use mt_logic_io::*;
-use mt_storage_io::TokenMetadata;
+use mt_storage_io::TokenId;
 use primitive_types::H256;
 
 const GAS_STORAGE_CREATION: u64 = 3_000_000_000;
@@ -32,6 +32,10 @@ struct MTLogic {
     instructions: HashMap<H256, (Instruction, Instruction)>,
     storage_code_hash: H256,
     id_to_storage: HashMap<String, ActorId>,
+    token_nonce: TokenId,
+    token_uris: HashMap<TokenId, String>,
+    token_total_supply: HashMap<TokenId, u128>,
+    token_owners: HashMap<TokenId, ActorId>,
 }
 
 impl MTLogic {
@@ -72,19 +76,35 @@ impl MTLogic {
                         )
                         .await
                     }
-                    Action::Mint { ids, amounts, meta } => {
-                        self.mint(transaction_hash, msg_source, &ids, &amounts, &meta)
-                            .await
-                    }
-                    Action::Burn { ids, amounts } => {
-                        self.burn(transaction_hash, msg_source, &ids, &amounts)
-                            .await
-                    }
                     Action::Approve {
                         account,
                         is_approved,
                     } => {
                         self.approve(transaction_hash, msg_source, &account, is_approved)
+                            .await
+                    }
+                    Action::Create {
+                        initial_amount,
+                        uri,
+                    } => {
+                        let _token_id = self
+                            .create(transaction_hash, msg_source, initial_amount, uri)
+                            .await;
+                    }
+                    Action::MintBatch {
+                        token_id,
+                        to,
+                        amounts,
+                    } => {
+                        self.mint_batch(transaction_hash, token_id, msg_source, &to, amounts)
+                            .await
+                    }
+                    Action::BurnBatch {
+                        token_id,
+                        burn_from,
+                        amounts,
+                    } => {
+                        self.burn_batch(transaction_hash, token_id, msg_source, &burn_from, amounts)
                             .await
                     }
                 }
@@ -163,6 +183,7 @@ impl MTLogic {
         }
     }
 
+    #[allow(clippy::too_many_arguments)]
     async fn transfer_single_storage(
         &mut self,
         transaction_hash: H256,
@@ -232,67 +253,154 @@ impl MTLogic {
         }
     }
 
-    async fn mint(
+    async fn create(
         &mut self,
         transaction_hash: H256,
         msg_source: &ActorId,
-        ids: &Vec<u128>,
-        amounts: &Vec<u128>,
-        meta: &Vec<Option<TokenMetadata>>,
-    ) {
+        initial_amount: u128,
+        uri: String,
+    ) -> TokenId {
         self.transaction_status
             .insert(transaction_hash, TransactionStatus::InProgress);
-        let storage_id = self.get_or_create_storage_address(msg_source);
 
-        let result = mint(
-            &storage_id,
+        let token_id = self.token_nonce.checked_add(1).expect("Math overflow!");
+
+        self.token_uris.insert(token_id, uri);
+        self.token_total_supply.insert(token_id, initial_amount);
+        self.token_owners.insert(token_id, *msg_source);
+
+        let to_storage_id = self.get_or_create_storage_address(msg_source);
+        let mut increase_instruction = create_increase_instruction(
             transaction_hash,
+            &to_storage_id,
+            token_id,
             msg_source,
-            ids,
-            amounts,
-            meta,
-        )
-        .await;
+            initial_amount,
+        );
 
-        match result {
-            Ok(()) => {
-                self.transaction_status
-                    .insert(transaction_hash, TransactionStatus::Success);
-                reply_ok();
-            }
-            Err(()) => {
-                self.transaction_status
-                    .insert(transaction_hash, TransactionStatus::Failure);
-                reply_err();
-            }
+        if increase_instruction.start().await.is_err() {
+            self.transaction_status
+                .insert(transaction_hash, TransactionStatus::Failure);
+            reply_err();
+            return 0;
         }
+
+        self.transaction_status
+            .insert(transaction_hash, TransactionStatus::Success);
+        reply_ok();
+
+        token_id
     }
 
-    async fn burn(
+    async fn mint_batch(
         &mut self,
         transaction_hash: H256,
+        token_id: TokenId,
         msg_source: &ActorId,
-        ids: &Vec<u128>,
-        amounts: &Vec<u128>,
+        to: &Vec<ActorId>,
+        amounts: Vec<u128>,
     ) {
         self.transaction_status
             .insert(transaction_hash, TransactionStatus::InProgress);
-        let storage_id = self.get_or_create_storage_address(msg_source);
 
-        let result = burn(&storage_id, transaction_hash, msg_source, ids, amounts).await;
+        if to.len() != amounts.len() || msg_source.is_zero() {
+            self.transaction_status
+                .insert(transaction_hash, TransactionStatus::Failure);
+            reply_err();
+            return;
+        }
 
-        match result {
-            Ok(()) => {
-                self.transaction_status
-                    .insert(transaction_hash, TransactionStatus::Success);
-                reply_ok();
-            }
-            Err(()) => {
+        // TODO: Check if `msg_source` can mint `token_id` token
+
+        for (i, to) in to.iter().enumerate() {
+            let amount = amounts[i];
+
+            let to_storage_id = self.get_or_create_storage_address(to);
+            let mut increase_instruction =
+                create_increase_instruction(transaction_hash, &to_storage_id, token_id, to, amount);
+
+            let token_total_supply = self
+                .token_total_supply
+                .get_mut(&token_id)
+                .expect("Unable to locate token.");
+            let new_token_total_supply = token_total_supply
+                .checked_add(amount)
+                .expect("Math overflow!");
+
+            if increase_instruction.start().await.is_err() {
                 self.transaction_status
                     .insert(transaction_hash, TransactionStatus::Failure);
                 reply_err();
+                return;
             }
+
+            *token_total_supply = new_token_total_supply;
         }
+
+        self.transaction_status
+            .insert(transaction_hash, TransactionStatus::Success);
+        reply_ok();
+    }
+
+    async fn burn_batch(
+        &mut self,
+        transaction_hash: H256,
+        token_id: TokenId,
+        msg_source: &ActorId,
+        burn_from: &Vec<ActorId>,
+        amounts: Vec<u128>,
+    ) {
+        self.transaction_status
+            .insert(transaction_hash, TransactionStatus::InProgress);
+
+        if burn_from.len() != amounts.len() || msg_source.is_zero() {
+            self.transaction_status
+                .insert(transaction_hash, TransactionStatus::Failure);
+            reply_err();
+            return;
+        }
+
+        for (i, from) in burn_from.iter().enumerate() {
+            let amount = amounts[i];
+
+            if !self.is_approved(msg_source, from).await {
+                self.transaction_status
+                    .insert(transaction_hash, TransactionStatus::Failure);
+                reply_err();
+                return;
+            }
+
+            let from_storage_id = self.get_or_create_storage_address(from);
+            let mut decrease_instruction = create_decrease_instruction(
+                transaction_hash,
+                &from_storage_id,
+                token_id,
+                msg_source,
+                from,
+                amount,
+            );
+
+            let token_total_supply = self
+                .token_total_supply
+                .get_mut(&token_id)
+                .expect("Unable to locate token.");
+            let new_token_total_supply = token_total_supply
+                .checked_sub(amount)
+                .expect("Math overflow!");
+
+            if decrease_instruction.start().await.is_err() {
+                self.transaction_status
+                    .insert(transaction_hash, TransactionStatus::Failure);
+                reply_err();
+                return;
+            }
+
+            *token_total_supply = new_token_total_supply;
+        }
+
+        self.transaction_status
+            .insert(transaction_hash, TransactionStatus::Success);
+        reply_ok();
     }
 
     fn clear(&mut self, transaction_hash: H256) {
@@ -339,22 +447,44 @@ impl MTLogic {
         }
     }
 
-    /// TODO: Implement all storage getters.
-    async fn get_approval(&self, account: &ActorId, approval_target: &ActorId) {
-        let encoded = hex::encode(account.as_ref());
+    async fn is_approved(&self, from: &ActorId, to: &ActorId) -> bool {
+        let encoded = hex::encode(from.as_ref());
         let id: String = encoded.chars().next().expect("Can't be None").to_string();
 
         if let Some(storage_id) = self.id_to_storage.get(&id) {
-            let approval = get_approval(storage_id, account, approval_target)
-                .await
-                .unwrap_or(false);
-
-            msg::reply(MTLogicEvent::Approval(approval), 0)
-                .expect("Error in a reply `MTLogicEvent::Approval`");
+            get_approval(storage_id, from, to).await.unwrap_or(false)
         } else {
-            msg::reply(MTLogicEvent::Approval(false), 0)
-                .expect("Error in a reply `MTLogicEvent::Approval`");
+            false
         }
+    }
+
+    async fn get_approval(&self, account: &ActorId, approval_target: &ActorId) {
+        msg::reply(
+            MTLogicEvent::Approval(self.is_approved(account, approval_target).await),
+            0,
+        )
+        .expect("Error in a reply `MTLogicEvent::Approval`.");
+    }
+
+    fn get_token_uri(&self, token_id: TokenId) -> String {
+        self.token_uris
+            .get(&token_id)
+            .expect("Unable to locate token.")
+            .clone()
+    }
+
+    fn get_token_owner(&self, token_id: TokenId) -> ActorId {
+        *self
+            .token_owners
+            .get(&token_id)
+            .expect("Unable to locate token.")
+    }
+
+    fn get_token_total_supply(&self, token_id: TokenId) -> u128 {
+        *self
+            .token_total_supply
+            .get(&token_id)
+            .expect("Unable to locate token.")
     }
 
     fn assert_main_contract(&self) {
@@ -383,7 +513,7 @@ pub enum TransactionStatus {
 }
 
 #[no_mangle]
-unsafe extern "C" fn init() {
+extern "C" fn init() {
     let init_config: InitMTLogic = msg::load().expect("Unable to decode `InitMTLogic`");
     let mt_logic = MTLogic {
         admin: init_config.admin,
@@ -391,7 +521,8 @@ unsafe extern "C" fn init() {
         mtoken_id: msg::source(),
         ..Default::default()
     };
-    MT_LOGIC = Some(mt_logic);
+
+    unsafe { MT_LOGIC = Some(mt_logic) };
 }
 
 #[no_mangle]
@@ -403,6 +534,16 @@ unsafe extern "C" fn meta_state() -> *mut [i32; 2] {
         MTLogicState::Storages => {
             let storages = Vec::from_iter(logic.id_to_storage.clone().into_iter());
             MTLogicStateReply::Storages(storages)
+        }
+        MTLogicState::GetTokenNonce => MTLogicStateReply::TokenNonce(logic.token_nonce),
+        MTLogicState::GetTokenURI(token_id) => {
+            MTLogicStateReply::TokenURI(logic.get_token_uri(token_id))
+        }
+        MTLogicState::GetTokenTotalSupply(token_id) => {
+            MTLogicStateReply::TokenTotalSupply(logic.get_token_total_supply(token_id))
+        }
+        MTLogicState::GetTokenOwner(token_id) => {
+            MTLogicStateReply::TokenOwner(logic.get_token_owner(token_id))
         }
     }
     .encode();
