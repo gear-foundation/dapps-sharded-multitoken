@@ -1,8 +1,34 @@
 #![no_std]
 
+use gmeta::{In, InOut, Metadata};
 use gstd::{prelude::*, ActorId};
 use mt_logic_io::TokenId;
 use primitive_types::H256;
+
+pub struct MTMainMetadata;
+
+impl Metadata for MTMainMetadata {
+    type Init = In<InitMToken>;
+    type Handle = InOut<MTokenAction, MTokenEvent>;
+    type Others = ();
+    type Reply = ();
+    type Signal = ();
+    type State = MTokenState;
+}
+
+#[derive(Debug, Encode, Decode, TypeInfo, Clone)]
+pub struct MTokenState {
+    pub admin: ActorId,
+    pub mt_logic_id: ActorId,
+    pub transactions: Vec<(H256, TransactionStatus)>,
+}
+
+#[derive(Encode, Decode, TypeInfo, Copy, Clone, Debug)]
+pub enum TransactionStatus {
+    InProgress,
+    Success,
+    Failure,
+}
 
 #[derive(Encode, Decode, TypeInfo, Debug)]
 pub enum MTokenAction {
@@ -38,23 +64,4 @@ pub enum MTokenEvent {
 pub struct InitMToken {
     pub storage_code_hash: H256,
     pub mt_logic_code_hash: H256,
-}
-
-#[derive(Encode, Decode, TypeInfo)]
-pub enum MTokenState {
-    TransactionStatus(ActorId, u64),
-    MTLogicId,
-}
-
-#[derive(Encode, Decode, TypeInfo)]
-pub enum MTokenStateReply {
-    TransactionStatus(Option<TransactionStatus>),
-    MTLogicId(ActorId),
-}
-
-#[derive(Encode, Decode, TypeInfo, Copy, Clone, Debug)]
-pub enum TransactionStatus {
-    InProgress,
-    Success,
-    Failure,
 }

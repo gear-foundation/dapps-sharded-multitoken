@@ -28,6 +28,10 @@ impl MTStorage {
     }
 
     fn get_approval(&self, account: &ActorId, approval_target: &ActorId) -> bool {
+        if account == approval_target {
+            return true;
+        }
+
         let account_approvals = self
             .approvals
             .get(account)
@@ -98,6 +102,7 @@ impl MTStorage {
         account: &ActorId,
         approve: bool,
     ) {
+        gstd::debug!("mt-storage::approve ->");
         self.assert_mt_contract();
 
         if let Some(status) = self.transaction_status.get(&transaction_hash) {
@@ -120,6 +125,8 @@ impl MTStorage {
             })
             .or_insert_with(|| [(*account, approve)].into());
 
+        gstd::debug!("mt-storage::approve::approvals: {:#?}", self.approvals);
+        gstd::debug!("mt-storage::approve <- Ok");
         reply_ok();
     }
 
@@ -164,14 +171,21 @@ impl MTStorage {
 
         send_delayed_clear(transaction_hash);
 
-        self.balances.entry(token_id).and_modify(|token_balances| {
-            token_balances
-                .entry(*account)
-                .and_modify(|balance| {
-                    *balance = (*balance).checked_add(amount).expect("Math overflow.")
-                })
-                .or_insert(amount);
-        });
+        self.balances
+            .entry(token_id)
+            .and_modify(|token_balances| {
+                token_balances
+                    .entry(*account)
+                    .and_modify(|balance| {
+                        *balance = (*balance).checked_add(amount).expect("Math overflow.")
+                    })
+                    .or_insert(amount);
+            })
+            .or_insert_with(|| {
+                let mut token_balances = HashMap::new();
+                token_balances.insert(*account, amount);
+                token_balances
+            });
 
         self.transaction_status.insert(transaction_hash, true);
         reply_ok();
@@ -212,11 +226,13 @@ impl MTStorage {
 
 #[no_mangle]
 unsafe extern "C" fn handle() {
+    gstd::debug!("mt-storage::handle ->");
     let action: MTStorageAction = msg::load().expect("Unable to load `MTStorageAction`.");
     let storage: &mut MTStorage = MT_STORAGE.get_or_insert(Default::default());
 
     match action {
         MTStorageAction::GetBalance { token_id, account } => {
+            gstd::debug!("MTStorageAction::GetBalance: {:?}, {:?}", token_id, account);
             msg::reply(
                 MTStorageEvent::Balance(storage.get_balance(token_id, &account)),
                 0,
@@ -227,6 +243,11 @@ unsafe extern "C" fn handle() {
             account,
             approval_target,
         } => {
+            gstd::debug!(
+                "MTStorageAction::GetApproval: {:?}, {:?}",
+                account,
+                approval_target
+            );
             msg::reply(
                 MTStorageEvent::Approval(storage.get_approval(&account, &approval_target)),
                 0,
@@ -241,6 +262,15 @@ unsafe extern "C" fn handle() {
             recipient,
             amount,
         } => {
+            gstd::debug!(
+                "MTStorageAction::Transfer: {:?}, {:?}, {:?}, {:?}, {:?}, {:?}",
+                transaction_hash,
+                token_id,
+                msg_source,
+                sender,
+                recipient,
+                amount
+            );
             storage.transfer(
                 transaction_hash,
                 token_id,
@@ -256,9 +286,17 @@ unsafe extern "C" fn handle() {
             account,
             approve,
         } => {
+            gstd::debug!(
+                "MTStorageAction::Approve: {:?}, {:?}, {:?}, {:?}",
+                transaction_hash,
+                msg_source,
+                account,
+                approve
+            );
             storage.approve(transaction_hash, &msg_source, &account, approve);
         }
         MTStorageAction::ClearTransaction(transaction_hash) => {
+            gstd::debug!("MTStorageAction::ClearTransaction: {:?}", transaction_hash);
             storage.clear_transaction(transaction_hash);
         }
         MTStorageAction::IncreaseBalance {
@@ -267,6 +305,13 @@ unsafe extern "C" fn handle() {
             account,
             amount,
         } => {
+            gstd::debug!(
+                "MTStorageAction::IncreaseBalance: {:?}, {:?}, {:?}, {:?}",
+                transaction_hash,
+                token_id,
+                account,
+                amount
+            );
             storage.increase_balance(transaction_hash, token_id, &account, amount);
         }
         MTStorageAction::DecreaseBalance {
@@ -276,6 +321,14 @@ unsafe extern "C" fn handle() {
             account,
             amount,
         } => {
+            gstd::debug!(
+                "MTStorageAction::DecreaseBalance: {:?}, {:?}, {:?}, {:?}, {:?}",
+                transaction_hash,
+                token_id,
+                msg_source,
+                account,
+                amount
+            );
             storage.decrease_balance(transaction_hash, token_id, &msg_source, &account, amount);
         }
     }
@@ -291,32 +344,39 @@ extern "C" fn init() {
 }
 
 #[no_mangle]
-unsafe extern "C" fn meta_state() -> *mut [i32; 2] {
-    let query: MTStorageState = msg::load().expect("Unable to decode `MTStorageState`.");
-    let storage: &mut MTStorage = MT_STORAGE.get_or_insert(Default::default());
+extern "C" fn state() {
+    let storage = unsafe { MT_STORAGE.as_ref().expect("Storage is not initialized.") };
+    let storage_state = MTStorageState {
+        mt_logic_id: storage.mt_logic_id,
+        transaction_status: storage
+            .transaction_status
+            .iter()
+            .map(|(key, value)| (*key, *value))
+            .collect(),
+        balances: storage
+            .balances
+            .iter()
+            .map(|(key, value)| (*key, value.iter().map(|(a, b)| (*a, *b)).collect()))
+            .collect(),
+        approvals: storage
+            .approvals
+            .iter()
+            .map(|(key, value)| {
+                (
+                    *key,
+                    value.iter().map(|(key, value)| (*key, *value)).collect(),
+                )
+            })
+            .collect(),
+    };
 
-    let encoded = match query {
-        MTStorageState::GetBalance { token_id, account } => {
-            MTStorageStateReply::Balance(storage.get_balance(token_id, &account))
-        }
-        MTStorageState::GetApproval {
-            account,
-            approval_target,
-        } => MTStorageStateReply::Approval(storage.get_approval(&account, &approval_target)),
-    }
-    .encode();
-
-    gstd::util::to_leak_ptr(encoded)
+    msg::reply(storage_state, 0).expect("Failed to share state.");
 }
 
-gstd::metadata! {
-    title: "Storage Multitoken contract",
-    handle:
-        input: MTStorageAction,
-        output: MTStorageEvent,
-    state:
-        input: MTStorageState,
-        output: MTStorageStateReply,
+#[no_mangle]
+extern "C" fn metahash() {
+    let metahash: [u8; 32] = include!("../.metahash");
+    msg::reply(metahash, 0).expect("Failed to share metahash.");
 }
 
 fn reply_ok() {

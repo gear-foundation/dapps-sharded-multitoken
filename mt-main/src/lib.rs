@@ -3,22 +3,10 @@
 use gstd::{exec, msg, prelude::*, prog::ProgramGenerator, ActorId};
 use hashbrown::HashMap;
 use mt_logic_io::{InitMTLogic, MTLogicAction, MTLogicEvent, TokenId};
-use mt_main_io::{
-    InitMToken, MTokenAction, MTokenEvent, MTokenState, MTokenStateReply, TransactionStatus,
-};
+use mt_main_io::*;
 use primitive_types::H256;
 
 const DELAY: u32 = 600_000;
-
-gstd::metadata! {
-    title: "Main Multitoken contract",
-    handle:
-        input: MTokenAction,
-        output: MTokenEvent,
-    state:
-        input: MTokenState,
-        output: MTokenStateReply,
-}
 
 #[derive(Default)]
 struct MToken {
@@ -39,7 +27,6 @@ impl MToken {
         let transaction_hash = get_hash(&msg::source(), transaction_id);
         let transaction = self.transactions.get(&transaction_hash);
 
-        //debug!("BEFORE SENDING");
         match transaction {
             None => {
                 // If transaction took place for the first time we set its status to `InProgress`
@@ -68,7 +55,6 @@ impl MToken {
 
     async fn send_message_then_reply(&mut self, transaction_hash: H256, payload: &[u8]) {
         let result = self.send_message(transaction_hash, payload).await;
-        //debug!("REPLY");
         match result {
             Ok(()) => {
                 self.transactions
@@ -93,7 +79,7 @@ impl MToken {
             },
             0,
         )
-        .expect("Error in sending a message to the multitoken logic contract")
+        .expect("Error in sending a message to the multitoken logic contract.")
         .await;
 
         match result {
@@ -195,26 +181,9 @@ extern "C" fn init() {
     unsafe { MTOKEN = Some(mtoken) };
 }
 
-#[no_mangle]
-unsafe extern "C" fn meta_state() -> *mut [i32; 2] {
-    let mtoken = MTOKEN.get_or_insert(Default::default());
-    let query: MTokenState = msg::load().expect("Unable to decode `MTokenState`.");
-
-    let encoded = match query {
-        MTokenState::TransactionStatus(account, transaction_id) => {
-            let transaction_hash = get_hash(&account, transaction_id);
-            let transaction = mtoken.transactions.get(&transaction_hash);
-            MTokenStateReply::TransactionStatus(transaction.copied())
-        }
-        MTokenState::MTLogicId => MTokenStateReply::MTLogicId(mtoken.mt_logic_id),
-    }
-    .encode();
-
-    gstd::util::to_leak_ptr(encoded)
-}
-
 #[gstd::async_main]
 async fn main() {
+    gstd::debug!("mt-main::main -> | {:#?}", msg::load_bytes());
     let action: MTokenAction = msg::load().expect("Unable to decode `MTokenAction`.");
     let mtoken: &mut MToken = unsafe { MTOKEN.get_or_insert(Default::default()) };
 
@@ -222,21 +191,55 @@ async fn main() {
         MTokenAction::Message {
             transaction_id,
             payload,
-        } => mtoken.message(transaction_id, &payload).await,
+        } => {
+            gstd::debug!("MTokenAction::Message: {:?}, {:?}", transaction_id, payload);
+            mtoken.message(transaction_id, &payload).await
+        }
         MTokenAction::UpdateLogicContract {
             mt_logic_code_hash,
             storage_code_hash,
         } => mtoken.update_logic_contract(mt_logic_code_hash, storage_code_hash),
-        MTokenAction::Clear(transaction_hash) => mtoken.clear(transaction_hash),
+        MTokenAction::Clear(transaction_hash) => {
+            gstd::debug!("MTokenAction::Clear: {:?}", transaction_hash);
+            mtoken.clear(transaction_hash)
+        }
         MTokenAction::GetBalance { token_id, account } => {
+            gstd::debug!("MTokenAction::GetBalance: {:?}, {:?}", token_id, account);
             mtoken.get_balance(token_id, &account).await
         }
         MTokenAction::GetApproval {
             account,
             approval_target,
-        } => mtoken.get_approval(&account, &approval_target).await,
-        MTokenAction::MigrateStorageAddresses => unimplemented!(),
+        } => {
+            gstd::debug!(
+                "MTokenAction::GetApproval: {:?}, {:?}",
+                account,
+                approval_target
+            );
+            mtoken.get_approval(&account, &approval_target).await
+        }
+        MTokenAction::MigrateStorageAddresses => {
+            gstd::debug!("MTokenAction::MigrateStorageAddresses");
+        }
     };
+}
+
+#[no_mangle]
+extern "C" fn state() {
+    let token = unsafe { MTOKEN.as_ref().expect("MToken is not initialized.") };
+    let token_state = MTokenState {
+        admin: token.admin,
+        mt_logic_id: token.mt_logic_id,
+        transactions: token.transactions.iter().map(|(a, b)| (*a, *b)).collect(),
+    };
+
+    msg::reply(token_state, 0).expect("Failed to share state.");
+}
+
+#[no_mangle]
+extern "C" fn metahash() {
+    let metahash: [u8; 32] = include!("../.metahash");
+    msg::reply(metahash, 0).expect("Failed to share metahash.");
 }
 
 fn reply_ok() {

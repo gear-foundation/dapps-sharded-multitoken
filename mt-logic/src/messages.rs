@@ -15,7 +15,7 @@ pub async fn get_balance(
         },
         0,
     )
-    .expect("Error in sending a message `MTStorageAction::GetBalance`")
+    .expect("Error in sending a message `MTStorageAction::GetBalance`.")
     .await;
 
     match result {
@@ -40,7 +40,7 @@ pub async fn get_approval(
         },
         0,
     )
-    .expect("Error in sending a message `MTStorageAction::GetApproval`")
+    .expect("Error in sending a message `MTStorageAction::GetApproval`.")
     .await;
 
     match result {
@@ -73,7 +73,7 @@ pub async fn transfer(
         },
         0,
     )
-    .expect("Error in sending a message `MTStorageAction::Transfer`")
+    .expect("Error in sending a message `MTStorageAction::Transfer`.")
     .await;
 
     match result {
@@ -102,7 +102,7 @@ pub async fn approve(
         },
         0,
     )
-    .expect("Error in sending a message `MTStorageAction::Approve`")
+    .expect("Error in sending a message `MTStorageAction::Approve`.")
     .await;
 
     match result {
@@ -132,7 +132,7 @@ pub async fn increase_balance(
         },
         0,
     )
-    .expect("Error in sending a message `MTStorageAction::IncreaseBalance`")
+    .expect("Error in sending a message `MTStorageAction::IncreaseBalance`.")
     .await;
 
     match result {
@@ -164,7 +164,7 @@ pub async fn decrease_balance(
         },
         0,
     )
-    .expect("Error in sending a message `MTStorageAction::DecreaseBalance`")
+    .expect("Error in sending a message `MTStorageAction::DecreaseBalance`.")
     .await;
 
     match result {

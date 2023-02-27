@@ -1,8 +1,9 @@
+use gmeta::{Decode, Encode, TypeInfo};
 use gstd::{msg, ActorId};
 use mt_storage_io::{MTStorageAction, MTStorageEvent};
 use primitive_types::H256;
 
-#[derive(Debug)]
+#[derive(Debug, Encode, Decode, TypeInfo, Clone)]
 pub enum InstructionState {
     ScheduledRun,
     ScheduledAbort,
@@ -10,7 +11,7 @@ pub enum InstructionState {
     Finished,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Encode, Decode, TypeInfo, Clone)]
 pub struct Instruction {
     state: InstructionState,
     address: ActorId,
