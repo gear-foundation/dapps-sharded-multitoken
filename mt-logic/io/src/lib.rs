@@ -8,6 +8,15 @@ pub use instruction::*;
 pub use mt_storage_io::TokenId;
 use primitive_types::H256;
 
+/// Upper bit of `TokenId` is a flag, that indicates if this is NFT or not.
+pub const NFT_BIT: TokenId = 1 << (mem::size_of::<TokenId>() * 8 - 1);
+
+/// Lower bits specifies NFT index.
+pub const NFT_INDEX_MASK: TokenId = (!0) as TokenId;
+
+/// TODO: Docs.
+pub const TYPE_MASK: TokenId = ((!0) as TokenId) << 64;
+
 pub struct MTLogicMetadata;
 
 impl Metadata for MTLogicMetadata {

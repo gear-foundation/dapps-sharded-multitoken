@@ -12,15 +12,6 @@ use primitive_types::H256;
 const GAS_STORAGE_CREATION: u64 = 3_000_000_000;
 const DELAY: u32 = 600_000;
 
-/// Upper bit of `TokenId` is a flag, that indicates if this is NFT or not.
-const NFT_BIT: TokenId = 1 << (mem::size_of::<TokenId>() * 8 - 1);
-
-/// Lower bits specifies NFT index.
-const NFT_INDEX_MASK: TokenId = (!0) as TokenId;
-
-/// TODO: Docs.
-const TYPE_MASK: TokenId = ((!0) as TokenId) << 64;
-
 #[derive(Default)]
 struct MTLogic {
     admin: ActorId,
@@ -142,10 +133,17 @@ impl MTLogic {
         recipient: &ActorId,
         amount: u128,
     ) {
+        gstd::debug!("mt-logic::transfer ->");
+
         if Self::is_nft(token_id) {
             // 1. Check that `msg_source` is eq to `sender` or approved
             if !self.is_approved(sender, msg_source).await {
                 // Error, not approved
+                gstd::debug!(
+                    "mt-logic::transfer::nft not approved :( | {:?}, {:?}",
+                    sender,
+                    msg_source
+                );
                 self.transaction_status
                     .insert(transaction_hash, TransactionStatus::Failure);
                 reply_err();
@@ -172,11 +170,14 @@ impl MTLogic {
             // 3. Set `token_id` nft owner to `recipient`
             self.nft_owners.insert(token_id, *recipient);
 
+            gstd::debug!("mt-logic::transfer::nft <- (Ok)");
             self.transaction_status
                 .insert(transaction_hash, TransactionStatus::Success);
             reply_ok();
             return;
         }
+
+        gstd::debug!("mt-logic::transfer::is_nft: false | {:#0130b}", token_id);
 
         let sender_storage_id = self.get_or_create_storage_address(sender);
         let recipient_storage_id = self.get_or_create_storage_address(recipient);
@@ -324,7 +325,9 @@ impl MTLogic {
         let next_nonce = self.token_nonce.checked_add(1).expect("Math overflow!");
 
         // Store the type in the upper 64 bits
-        let mut token_type = next_nonce << (mem::size_of::<TokenId>() * 8);
+        // Before: 0 0 0 0 0 0 1
+        // After:  0 0 0 1 0 0 0
+        let mut token_type = next_nonce << (mem::size_of::<TokenId>() * 8 / 2);
 
         // Set a flag, if this is an NFT
         if is_nft {
@@ -421,10 +424,16 @@ impl MTLogic {
         _msg_source: &ActorId,
         to: &Vec<ActorId>,
     ) {
+        gstd::debug!("mt-logic::mint_batch_nft ->");
+
         self.transaction_status
             .insert(transaction_hash, TransactionStatus::InProgress);
 
         if !Self::is_nft(token_id) {
+            gstd::debug!(
+                "mt-logic::mint_batch_nft::is_nft -> false | {:#0130b}",
+                token_id
+            );
             self.transaction_status
                 .insert(transaction_hash, TransactionStatus::Failure);
             reply_err();
@@ -452,6 +461,7 @@ impl MTLogic {
             self.nft_owners.insert(id, *to);
         }
 
+        gstd::debug!("mt-logic::mint_batch_nft <- (Ok)");
         self.transaction_status
             .insert(transaction_hash, TransactionStatus::Success);
         reply_ok();
@@ -639,7 +649,7 @@ impl MTLogic {
         if let Some(storage_id) = self.id_to_storage.get(&id) {
             get_approval(storage_id, from, to).await.unwrap_or(false)
         } else {
-            false
+            from == to
         }
     }
 
@@ -666,7 +676,7 @@ impl MTLogic {
 
     #[allow(unused)]
     fn get_nft_base_type(token_id: TokenId) -> TokenId {
-        token_id * TYPE_MASK
+        token_id & TYPE_MASK
     }
 
     #[allow(unused)]
@@ -675,7 +685,7 @@ impl MTLogic {
     }
 
     #[allow(unused)]
-    fn is_nft_base_item(token_id: TokenId) -> bool {
+    fn is_nft_item(token_id: TokenId) -> bool {
         (token_id & NFT_BIT == NFT_BIT) && (token_id & NFT_INDEX_MASK != 0)
     }
 

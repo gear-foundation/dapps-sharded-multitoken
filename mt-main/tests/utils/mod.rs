@@ -6,7 +6,7 @@ use mt_main_io::{InitMToken, MTokenAction, MTokenEvent};
 pub const ROOT_ACCOUNT: u64 = 100;
 
 #[allow(unused)]
-pub const USER_ACCOUNTS: [u64; 2] = [200, 300];
+pub const USER_ACCOUNTS: [u64; 3] = [200, 300, 400];
 
 pub trait MToken {
     fn mtoken(system: &System) -> Program;
@@ -69,10 +69,10 @@ impl MToken for Program<'_> {
         let mtoken = Program::current(system);
 
         let storage_code_hash: [u8; 32] = system
-            .submit_code("../target/wasm32-unknown-unknown/release/mt_storage.wasm")
+            .submit_code("../target/wasm32-unknown-unknown/debug/mt_storage.wasm")
             .into();
         let mt_logic_code_hash: [u8; 32] = system
-            .submit_code("../target/wasm32-unknown-unknown/release/mt_logic.wasm")
+            .submit_code("../target/wasm32-unknown-unknown/debug/mt_logic.wasm")
             .into();
 
         let res = mtoken.send(
