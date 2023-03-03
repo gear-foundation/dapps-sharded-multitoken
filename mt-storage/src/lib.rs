@@ -1,11 +1,11 @@
 #![no_std]
 
-use gstd::{exec, msg, prelude::*, ActorId};
+use gstd::{msg, prelude::*, ActorId};
 use hashbrown::HashMap;
 use mt_storage_io::*;
 use primitive_types::H256;
 
-const DELAY: u32 = 600_000;
+// const DELAY: u32 = 600_000;
 
 #[derive(Default)]
 struct MTStorage {
@@ -70,8 +70,6 @@ impl MTStorage {
             return;
         }
 
-        send_delayed_clear(transaction_hash);
-
         match self.decrease(token_id, msg_source, sender, amount) {
             true => {
                 let token_balances = self
@@ -102,7 +100,6 @@ impl MTStorage {
         account: &ActorId,
         approve: bool,
     ) {
-        gstd::debug!("mt-storage::approve ->");
         self.assert_mt_contract();
 
         if let Some(status) = self.transaction_status.get(&transaction_hash) {
@@ -112,8 +109,6 @@ impl MTStorage {
             };
             return;
         }
-
-        send_delayed_clear(transaction_hash);
 
         self.approvals
             .entry(*msg_source)
@@ -125,8 +120,6 @@ impl MTStorage {
             })
             .or_insert_with(|| [(*account, approve)].into());
 
-        gstd::debug!("mt-storage::approve::approvals: {:#?}", self.approvals);
-        gstd::debug!("mt-storage::approve <- Ok");
         reply_ok();
     }
 
@@ -169,8 +162,6 @@ impl MTStorage {
             return;
         }
 
-        send_delayed_clear(transaction_hash);
-
         self.balances
             .entry(token_id)
             .and_modify(|token_balances| {
@@ -209,8 +200,6 @@ impl MTStorage {
             return;
         }
 
-        send_delayed_clear(transaction_hash);
-
         match self.decrease(token_id, msg_source, account, amount) {
             true => {
                 self.transaction_status.insert(transaction_hash, true);
@@ -226,13 +215,11 @@ impl MTStorage {
 
 #[no_mangle]
 unsafe extern "C" fn handle() {
-    gstd::debug!("mt-storage::handle ->");
     let action: MTStorageAction = msg::load().expect("Unable to load `MTStorageAction`.");
     let storage: &mut MTStorage = MT_STORAGE.get_or_insert(Default::default());
 
     match action {
         MTStorageAction::GetBalance { token_id, account } => {
-            gstd::debug!("MTStorageAction::GetBalance: {:?}, {:?}", token_id, account);
             msg::reply(
                 MTStorageEvent::Balance(storage.get_balance(token_id, &account)),
                 0,
@@ -243,11 +230,6 @@ unsafe extern "C" fn handle() {
             account,
             approval_target,
         } => {
-            gstd::debug!(
-                "MTStorageAction::GetApproval: {:?}, {:?}",
-                account,
-                approval_target
-            );
             msg::reply(
                 MTStorageEvent::Approval(storage.get_approval(&account, &approval_target)),
                 0,
@@ -262,15 +244,6 @@ unsafe extern "C" fn handle() {
             recipient,
             amount,
         } => {
-            gstd::debug!(
-                "MTStorageAction::Transfer: {:?}, {:?}, {:?}, {:?}, {:?}, {:?}",
-                transaction_hash,
-                token_id,
-                msg_source,
-                sender,
-                recipient,
-                amount
-            );
             storage.transfer(
                 transaction_hash,
                 token_id,
@@ -286,17 +259,9 @@ unsafe extern "C" fn handle() {
             account,
             approve,
         } => {
-            gstd::debug!(
-                "MTStorageAction::Approve: {:?}, {:?}, {:?}, {:?}",
-                transaction_hash,
-                msg_source,
-                account,
-                approve
-            );
             storage.approve(transaction_hash, &msg_source, &account, approve);
         }
         MTStorageAction::ClearTransaction(transaction_hash) => {
-            gstd::debug!("MTStorageAction::ClearTransaction: {:?}", transaction_hash);
             storage.clear_transaction(transaction_hash);
         }
         MTStorageAction::IncreaseBalance {
@@ -305,13 +270,6 @@ unsafe extern "C" fn handle() {
             account,
             amount,
         } => {
-            gstd::debug!(
-                "MTStorageAction::IncreaseBalance: {:?}, {:?}, {:?}, {:?}",
-                transaction_hash,
-                token_id,
-                account,
-                amount
-            );
             storage.increase_balance(transaction_hash, token_id, &account, amount);
         }
         MTStorageAction::DecreaseBalance {
@@ -321,14 +279,6 @@ unsafe extern "C" fn handle() {
             account,
             amount,
         } => {
-            gstd::debug!(
-                "MTStorageAction::DecreaseBalance: {:?}, {:?}, {:?}, {:?}, {:?}",
-                transaction_hash,
-                token_id,
-                msg_source,
-                account,
-                amount
-            );
             storage.decrease_balance(transaction_hash, token_id, &msg_source, &account, amount);
         }
     }
@@ -385,14 +335,4 @@ fn reply_ok() {
 
 fn reply_err() {
     msg::reply(MTStorageEvent::Err, 0).expect("error in sending a reply `MTStorageEvent::Err`.");
-}
-
-fn send_delayed_clear(transaction_hash: H256) {
-    msg::send_delayed(
-        exec::program_id(),
-        MTStorageAction::ClearTransaction(transaction_hash),
-        0,
-        DELAY,
-    )
-    .expect("Error in sending a delayled message `MTStorageAction::ClearTransaction`.");
 }

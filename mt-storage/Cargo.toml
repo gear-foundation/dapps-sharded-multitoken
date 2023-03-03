@@ -8,10 +8,10 @@ authors = ["Gear Technologies"]
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-gstd = { git = "https://github.com/gear-tech/gear.git", branch = "testnet", features = ["debug"] }
+gstd = { git = "https://github.com/gear-tech/gear.git", branch = "testnet" }
 mt-storage-io = { path = "io" }
 primitive-types = { version = "0.12.1", default-features = false }
-hashbrown = { version = "0.13.1" }
+hashbrown = { version = "0.13.2" }
 
 [build-dependencies]
 mt-storage-io = { path = "io" }

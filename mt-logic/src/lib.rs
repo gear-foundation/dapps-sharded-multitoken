@@ -2,7 +2,7 @@
 
 mod messages;
 
-use gstd::{exec, msg, prelude::*, prog::ProgramGenerator, ActorId};
+use gstd::{msg, prelude::*, prog::ProgramGenerator, ActorId};
 use hashbrown::HashMap;
 use messages::*;
 use mt_logic_io::*;
@@ -10,7 +10,6 @@ use mt_storage_io::TokenId;
 use primitive_types::H256;
 
 const GAS_STORAGE_CREATION: u64 = 3_000_000_000;
-const DELAY: u32 = 600_000;
 
 #[derive(Default)]
 struct MTLogic {
@@ -45,7 +44,6 @@ impl MTLogic {
             // The transaction took place for the first time
             // Or there was not enough gas to change the `TransactionStatus`
             TransactionStatus::InProgress => {
-                send_delayed_clear(transaction_hash);
                 self.transaction_status
                     .insert(transaction_hash, TransactionStatus::InProgress);
 
@@ -56,7 +54,6 @@ impl MTLogic {
                         recipient,
                         amount,
                     } => {
-                        gstd::debug!("mt-logic::Action::Transfer");
                         self.transfer(
                             transaction_hash,
                             token_id,
@@ -71,7 +68,6 @@ impl MTLogic {
                         account,
                         is_approved,
                     } => {
-                        gstd::debug!("mt-logic::Action::Approve: {:?}, {}", account, is_approved);
                         self.approve(transaction_hash, msg_source, &account, is_approved)
                             .await
                     }
@@ -80,7 +76,6 @@ impl MTLogic {
                         uri,
                         is_nft,
                     } => {
-                        gstd::debug!("mt-logic::Action::Create");
                         let _token_id = self
                             .create(transaction_hash, msg_source, initial_amount, uri, is_nft)
                             .await;
@@ -90,12 +85,10 @@ impl MTLogic {
                         to,
                         amounts,
                     } => {
-                        gstd::debug!("mt-logic::Action::MintBatchFT");
                         self.mint_batch_ft(transaction_hash, token_id, msg_source, &to, amounts)
                             .await
                     }
                     Action::MintBatchNFT { token_id, to } => {
-                        gstd::debug!("mt-logic::Action::MintBatchNFT");
                         self.mint_batch_nft(transaction_hash, token_id, msg_source, &to)
                             .await
                     }
@@ -104,7 +97,6 @@ impl MTLogic {
                         burn_from,
                         amounts,
                     } => {
-                        gstd::debug!("mt-logic::Action::BurnBatchFT");
                         self.burn_batch_ft(
                             transaction_hash,
                             token_id,
@@ -115,7 +107,6 @@ impl MTLogic {
                         .await
                     }
                     Action::BurnNFT { token_id, from } => {
-                        gstd::debug!("mt-logic::Action::BurnBatchNFT");
                         self.burn_nft(transaction_hash, token_id, msg_source, &from)
                             .await
                     }
@@ -133,17 +124,10 @@ impl MTLogic {
         recipient: &ActorId,
         amount: u128,
     ) {
-        gstd::debug!("mt-logic::transfer ->");
-
         if Self::is_nft(token_id) {
             // 1. Check that `msg_source` is eq to `sender` or approved
             if !self.is_approved(sender, msg_source).await {
                 // Error, not approved
-                gstd::debug!(
-                    "mt-logic::transfer::nft not approved :( | {:?}, {:?}",
-                    sender,
-                    msg_source
-                );
                 self.transaction_status
                     .insert(transaction_hash, TransactionStatus::Failure);
                 reply_err();
@@ -170,14 +154,11 @@ impl MTLogic {
             // 3. Set `token_id` nft owner to `recipient`
             self.nft_owners.insert(token_id, *recipient);
 
-            gstd::debug!("mt-logic::transfer::nft <- (Ok)");
             self.transaction_status
                 .insert(transaction_hash, TransactionStatus::Success);
             reply_ok();
             return;
         }
-
-        gstd::debug!("mt-logic::transfer::is_nft: false | {:#0130b}", token_id);
 
         let sender_storage_id = self.get_or_create_storage_address(sender);
         let recipient_storage_id = self.get_or_create_storage_address(recipient);
@@ -424,16 +405,10 @@ impl MTLogic {
         _msg_source: &ActorId,
         to: &Vec<ActorId>,
     ) {
-        gstd::debug!("mt-logic::mint_batch_nft ->");
-
         self.transaction_status
             .insert(transaction_hash, TransactionStatus::InProgress);
 
         if !Self::is_nft(token_id) {
-            gstd::debug!(
-                "mt-logic::mint_batch_nft::is_nft -> false | {:#0130b}",
-                token_id
-            );
             self.transaction_status
                 .insert(transaction_hash, TransactionStatus::Failure);
             reply_err();
@@ -461,7 +436,6 @@ impl MTLogic {
             self.nft_owners.insert(id, *to);
         }
 
-        gstd::debug!("mt-logic::mint_batch_nft <- (Ok)");
         self.transaction_status
             .insert(transaction_hash, TransactionStatus::Success);
         reply_ok();
@@ -635,17 +609,9 @@ impl MTLogic {
     }
 
     async fn is_approved(&self, from: &ActorId, to: &ActorId) -> bool {
-        gstd::debug!("mt-logic::is_approved -> {:?}, {:?}", from, to);
-
         let encoded = hex::encode(from.as_ref());
         let id: String = encoded.chars().next().expect("Can't be None.").to_string();
 
-        gstd::debug!("mt-logic::is_approved::id: {:?}", id);
-
-        gstd::debug!(
-            "mt-logic::is_approved::id_to_storage: {:#?}",
-            self.id_to_storage
-        );
         if let Some(storage_id) = self.id_to_storage.get(&id) {
             get_approval(storage_id, from, to).await.unwrap_or(false)
         } else {
@@ -676,7 +642,7 @@ impl MTLogic {
 
     #[allow(unused)]
     fn get_nft_base_type(token_id: TokenId) -> TokenId {
-        token_id & TYPE_MASK
+        token_id & NFT_TYPE_MASK
     }
 
     #[allow(unused)]
@@ -747,7 +713,6 @@ extern "C" fn init() {
 
 #[gstd::async_main]
 async fn main() {
-    gstd::debug!("mt-logic::main ->");
     let action: MTLogicAction = msg::load().expect("Error in loading `MTLogicAction`");
     let logic: &mut MTLogic = unsafe { MT_LOGIC.get_or_insert(Default::default()) };
 
@@ -756,30 +721,14 @@ async fn main() {
             transaction_hash,
             account,
             payload,
-        } => {
-            gstd::debug!(
-                "MTLogicAction::Message: {:?}, {:?}, {:?}",
-                transaction_hash,
-                account,
-                payload
-            );
-            logic.message(transaction_hash, &account, &payload).await
-        }
+        } => logic.message(transaction_hash, &account, &payload).await,
         MTLogicAction::GetBalance { token_id, account } => {
-            gstd::debug!("MTLogicAction::GetBalance: {:?}, {:?}", token_id, account);
             logic.get_balance(token_id, &account).await
         }
         MTLogicAction::GetApproval {
             account,
             approval_target,
-        } => {
-            gstd::debug!(
-                "MTLogicAction::GetApproval: {:?}, {:?}",
-                account,
-                approval_target
-            );
-            logic.get_approval(&account, &approval_target).await
-        }
+        } => logic.get_approval(&account, &approval_target).await,
         MTLogicAction::UpdateStorageCodeHash(storage_code_hash) => {
             logic.update_storage_hash(storage_code_hash)
         }
@@ -839,14 +788,4 @@ fn reply_err() {
 
 fn reply_ok() {
     msg::reply(MTLogicEvent::Ok, 0).expect("Error in sending a reply `MTLogicEvent::Ok`");
-}
-
-fn send_delayed_clear(transaction_hash: H256) {
-    msg::send_delayed(
-        exec::program_id(),
-        MTLogicAction::Clear(transaction_hash),
-        0,
-        DELAY,
-    )
-    .expect("Error in sending a delayled message `MTStorageAction::Clear`");
 }
