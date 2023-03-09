@@ -9,9 +9,9 @@ const MT_STORAGE_WASM_PATH: &str = "../target/wasm32-unknown-unknown/debug/mt_st
 const MT_MAIN_WASM_PATH: &str = "../target/wasm32-unknown-unknown/debug/mt_main.opt.wasm";
 const HASH_LENGTH: usize = 32;
 type Hash = [u8; HASH_LENGTH];
-pub const USER_ACCOUNTS: [&str; 3] = ["//Bob", "//John", "//Amy"];
+pub const USER_ACCOUNTS: [&str; 3] = ["//Bob", "//Alice", "//Amy"];
 
-pub async fn setup_gclient() -> gclient::Result<(GearApi, ActorId, EventListener)> {
+pub async fn setup_gclient() -> gclient::Result<(GearApi, ActorId)> {
     let api = GearApi::dev().await?;
 
     let mut listener = api.subscribe().await?;
@@ -52,7 +52,23 @@ pub async fn setup_gclient() -> gclient::Result<(GearApi, ActorId, EventListener
         .try_into()
         .expect("Unexpected invalid program id.");
 
-    Ok((api, program_id.into(), listener))
+    Ok((api, program_id.into()))
+}
+
+pub fn gclient_with_account(
+    api: GearApi,
+    account: impl AsRef<str>,
+) -> gclient::Result<(GearApi, ActorId)> {
+    let api = api.with(account.as_ref())?;
+    let actor_id = ActorId::new(api.account_id().clone().into());
+    Ok((api, actor_id))
+}
+
+pub fn get_actor_id(api: &GearApi, account: impl AsRef<str>) -> gclient::Result<ActorId> {
+    let temp_api = api.clone().with(account.as_ref())?;
+    let actor_id = ActorId::new(temp_api.account_id().clone().into());
+
+    Ok(actor_id)
 }
 
 pub async fn upload_with_code_hash(
@@ -86,19 +102,20 @@ pub async fn send_mtoken_message(
         .try_into()
         .expect("Unexpected invalid program id.");
 
-    println!("BEFORE CALC HANDLE GAS");
     let gas_info = api
         .calculate_handle_gas(None, program_id.into(), payload.encode(), 0, true)
         .await?;
 
-    println!("BEFORE SEND MESSAGE");
-    // TODO: Storage not found
     let (message_id, _) = api
-        .send_message(program_id.into(), payload, gas_info.min_limit, 0)
+        .send_message(program_id.into(), payload, gas_info.min_limit * 2, 0)
         .await?;
 
-    println!("BEFORE MESSAGE PROCESSED");
-    assert!(listener.message_processed(message_id).await?.succeed());
+    let status = listener.message_processed(message_id).await?;
+    if status.failed() {
+        println!("{:#?}", status);
+    }
+
+    assert!(status.succeed());
 
     Ok(())
 }

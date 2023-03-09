@@ -24,4 +24,4 @@ gstd = { git = "https://github.com/gear-tech/gear.git", branch = "testnet", feat
 gtest = { git = "https://github.com/gear-tech/gear.git", branch = "testnet" }
 gclient = { git = "https://github.com/gear-tech/gear.git", branch = "testnet" }
 blake2-rfc = { version = "0.2.18", default-features = false }
-tokio = { version = "1.26.0", features = ["full"] }
+tokio = "1"

@@ -28,4 +28,4 @@ test:
 
 full-test:
 	@echo ⚙️ Running all tests...
-	@cargo +nightly t -- --include-ignored
+	@cargo +nightly t -- --include-ignored --test-threads=1
