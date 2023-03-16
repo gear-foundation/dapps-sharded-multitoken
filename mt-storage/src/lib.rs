@@ -5,8 +5,6 @@ use hashbrown::HashMap;
 use mt_storage_io::*;
 use primitive_types::H256;
 
-// const DELAY: u32 = 600_000;
-
 #[derive(Default)]
 struct MTStorage {
     mt_logic_id: ActorId,
@@ -214,9 +212,9 @@ impl MTStorage {
 }
 
 #[no_mangle]
-unsafe extern "C" fn handle() {
+extern "C" fn handle() {
     let action: MTStorageAction = msg::load().expect("Unable to load `MTStorageAction`.");
-    let storage: &mut MTStorage = MT_STORAGE.get_or_insert(Default::default());
+    let storage: &mut MTStorage = unsafe { MT_STORAGE.get_or_insert(Default::default()) };
 
     match action {
         MTStorageAction::GetBalance { token_id, account } => {
