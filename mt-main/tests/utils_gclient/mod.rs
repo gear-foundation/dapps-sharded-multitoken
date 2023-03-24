@@ -1,3 +1,5 @@
+#![allow(unused)]
+
 use blake2_rfc::blake2b;
 use gclient::{EventListener, EventProcessor, GearApi};
 use gstd::{prelude::*, ActorId};
@@ -16,6 +18,22 @@ pub async fn setup_gclient() -> gclient::Result<(GearApi, ActorId)> {
 
     let mut listener = api.subscribe().await?;
     assert!(listener.blocks_running().await?);
+
+    let user_account_0 = {
+        let api = api.clone().with(USER_ACCOUNTS[0])?;
+        ActorId::new(api.account_id().clone().into())
+    };
+    let user_account_2 = {
+        let api = api.clone().with(USER_ACCOUNTS[2])?;
+        ActorId::new(api.account_id().clone().into())
+    };
+
+    let user_fund = api.total_balance(api.account_id()).await? / 3;
+
+    api.transfer(user_account_0.as_ref().into(), user_fund)
+        .await?;
+    api.transfer(user_account_2.as_ref().into(), user_fund)
+        .await?;
 
     let storage_code_hash = upload_with_code_hash(&api, MT_STORAGE_WASM_PATH).await?;
     let mt_logic_code_hash = upload_with_code_hash(&api, MT_LOGIC_WASM_PATH).await?;
@@ -39,9 +57,9 @@ pub async fn setup_gclient() -> gclient::Result<(GearApi, ActorId)> {
     let (message_id, program_id, _hash) = api
         .upload_program_bytes(
             gclient::code_from_os(MT_MAIN_WASM_PATH)?,
-            gclient::now_in_micros().to_le_bytes(),
+            gclient::now_micros().to_le_bytes(),
             init_mtoken_config,
-            gas_info.min_limit,
+            gas_info.min_limit * 5,
             0,
         )
         .await?;
@@ -80,7 +98,21 @@ pub async fn upload_with_code_hash(
 
     code_hash[..].copy_from_slice(blake2b::blake2b(HASH_LENGTH, &[], &wasm_code).as_bytes());
 
-    api.upload_code(wasm_code).await?;
+    match api.upload_code(wasm_code).await {
+        // Catch re-upload
+        Err(gclient::Error::Subxt(subxt::Error::Runtime(subxt::error::DispatchError::Module(
+            subxt::error::ModuleError {
+                error_data:
+                    subxt::error::ModuleErrorData {
+                        pallet_index: 104,
+                        error: [6, 0, 0, 0],
+                    },
+                ..
+            },
+        )))) => {}
+        Err(error) => return Err(error),
+        _ => {}
+    };
 
     Ok(code_hash)
 }
@@ -107,15 +139,15 @@ pub async fn send_mtoken_message(
         .await?;
 
     let (message_id, _) = api
-        .send_message(program_id.into(), payload, gas_info.min_limit * 2, 0)
+        .send_message(program_id.into(), payload, gas_info.min_limit * 5, 0)
         .await?;
 
-    let status = listener.message_processed(message_id).await?;
-    if status.failed() {
-        println!("{:#?}", status);
-    }
+    let (_, reply_data_result, _) = listener.reply_bytes_on(message_id).await?;
+    let reply = reply_data_result.expect("Unexpected invalid reply.");
 
-    assert!(status.succeed());
+    let mt_main_io::MTokenEvent::Ok = mt_main_io::MTokenEvent::decode(&mut reply.as_ref()).expect("Unexpected invalid `MTokenEvent` data.") else {
+        panic!("Unexpected invalid `MTokenEvent`.");
+    };
 
     Ok(())
 }
@@ -298,7 +330,7 @@ pub async fn mtoken_get_balance(
         .await?;
 
     let (message_id, _) = api
-        .send_message(program_id.into(), payload, gas_info.min_limit * 2, 0)
+        .send_message(program_id.into(), payload, gas_info.min_limit * 5, 0)
         .await?;
 
     let (_, reply_data_result, _) = listener.reply_bytes_on(message_id).await?;
@@ -334,7 +366,7 @@ pub async fn mtoken_get_approval(
         .await?;
 
     let (message_id, _) = api
-        .send_message(program_id.into(), payload, gas_info.min_limit, 0)
+        .send_message(program_id.into(), payload, gas_info.min_limit * 5, 0)
         .await?;
 
     let (_, reply_data_result, _) = listener.reply_bytes_on(message_id).await?;

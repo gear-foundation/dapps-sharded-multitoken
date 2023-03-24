@@ -20,6 +20,7 @@ gear-wasm-builder = { git = "https://github.com/gear-tech/gear.git", branch = "t
 [dev-dependencies]
 gstd = { git = "https://github.com/gear-tech/gear.git", branch = "testnet", features = ["debug"] }
 gtest = { git = "https://github.com/gear-tech/gear.git", branch = "testnet" }
-gclient = { git = "https://github.com/gear-tech/gear.git", branch = "testnet" }
+gclient = { git = "https://github.com/gear-tech/gear.git", branch = "master" }
 blake2-rfc = { version = "0.2.18", default-features = false }
+subxt = { version = "0.27", default-features = false }
 tokio = "1"
