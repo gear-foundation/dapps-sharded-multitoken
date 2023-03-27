@@ -987,7 +987,7 @@ dependencies = [
 [[package]]
 name = "gclient"
 version = "0.1.0"
-source = "git+https://github.com/gear-tech/gear.git?branch=master#bdf4b2b1c8d18e19355c6f1fb7e42fd408e93e95"
+source = "git+https://github.com/gear-tech/gear.git?branch=master#1cad96387e643199777b94da07a3ed7a58d517b2"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -1049,7 +1049,7 @@ dependencies = [
 [[package]]
 name = "gear-core"
 version = "0.1.0"
-source = "git+https://github.com/gear-tech/gear.git?branch=master#bdf4b2b1c8d18e19355c6f1fb7e42fd408e93e95"
+source = "git+https://github.com/gear-tech/gear.git?branch=master#1cad96387e643199777b94da07a3ed7a58d517b2"
 dependencies = [
  "blake2-rfc",
  "derive_more",
@@ -1085,7 +1085,7 @@ dependencies = [
 [[package]]
 name = "gear-core-errors"
 version = "0.1.0"
-source = "git+https://github.com/gear-tech/gear.git?branch=master#bdf4b2b1c8d18e19355c6f1fb7e42fd408e93e95"
+source = "git+https://github.com/gear-tech/gear.git?branch=master#1cad96387e643199777b94da07a3ed7a58d517b2"
 dependencies = [
  "derive_more",
  "enum-iterator",
@@ -1121,7 +1121,7 @@ dependencies = [
 [[package]]
 name = "gear-utils"
 version = "0.1.0"
-source = "git+https://github.com/gear-tech/gear.git?branch=master#bdf4b2b1c8d18e19355c6f1fb7e42fd408e93e95"
+source = "git+https://github.com/gear-tech/gear.git?branch=master#1cad96387e643199777b94da07a3ed7a58d517b2"
 dependencies = [
  "env_logger",
  "nonempty",
@@ -1148,7 +1148,7 @@ dependencies = [
 [[package]]
 name = "gear-wasm-instrument"
 version = "0.1.0"
-source = "git+https://github.com/gear-tech/gear.git?branch=master#bdf4b2b1c8d18e19355c6f1fb7e42fd408e93e95"
+source = "git+https://github.com/gear-tech/gear.git?branch=master#1cad96387e643199777b94da07a3ed7a58d517b2"
 dependencies = [
  "enum-iterator",
  "wasm-instrument",
@@ -1243,7 +1243,7 @@ dependencies = [
 [[package]]
 name = "gsdk"
 version = "0.1.0"
-source = "git+https://github.com/gear-tech/gear.git?branch=master#bdf4b2b1c8d18e19355c6f1fb7e42fd408e93e95"
+source = "git+https://github.com/gear-tech/gear.git?branch=master#1cad96387e643199777b94da07a3ed7a58d517b2"
 dependencies = [
  "anyhow",
  "async-recursion",
