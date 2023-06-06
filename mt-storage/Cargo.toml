@@ -9,7 +9,7 @@ authors = ["Gear Technologies"]
 gstd = { git = "https://github.com/gear-tech/gear.git", rev = "5c685d0f15c412ab6ee019ceaf7ce084426dfb68" }
 mt-storage-io = { path = "io" }
 primitive-types = { version = "0.12.1", default-features = false }
-hashbrown = { version = "0.13.2" }
+hashbrown = { version = "0.14.0" }
 
 [build-dependencies]
 mt-storage-io = { path = "io" }
