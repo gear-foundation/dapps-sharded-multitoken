@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"constant":["NFT_BIT","NFT_INDEX_MASK","NFT_TYPE_MASK"],"enum":["InstructionState","MTLogicAction","MTLogicEvent","TransactionStatus"],"fn":["create_decrease_instruction","create_increase_instruction"],"struct":["InitMTLogic","Instruction","MTLogicMetadata","MTLogicState"],"type":["TokenId"]};

@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"enum":["LogicAction","MTokenAction","MTokenEvent","TransactionStatus"],"struct":["InitMToken","MTMainMetadata","MTokenState"],"type":["TokenId"]};

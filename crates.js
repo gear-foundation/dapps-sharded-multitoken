@@ -1,0 +1,1 @@
+window.ALL_CRATES = ["mt_logic","mt_logic_io","mt_main","mt_main_io","mt_storage","mt_storage_io"];
