@@ -41,6 +41,7 @@ impl Instruction {
                     self.address,
                     self.transaction.clone(),
                     0,
+                    0,
                 )
                 .expect("Error in sending a message in instruction")
                 .await;
@@ -69,6 +70,7 @@ impl Instruction {
                     self.compensation
                         .as_ref()
                         .expect("No compensation for that instruction"),
+                    0,
                     0,
                 )
                 .expect("Error in sending a compensation message in instruction")

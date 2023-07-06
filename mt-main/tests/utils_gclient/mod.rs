@@ -1,7 +1,7 @@
 #![allow(unused)]
 
 use blake2_rfc::blake2b;
-use gclient::{EventListener, EventProcessor, GearApi};
+use gclient::{Error as GclientError, EventListener, EventProcessor, GearApi};
 use gstd::{prelude::*, ActorId};
 use mt_main_io::{InitMToken, LogicAction, MTokenAction, MTokenEvent, TokenId};
 
@@ -52,18 +52,17 @@ pub async fn setup_gclient() -> gclient::Result<(GearApi, ActorId)> {
             true,
         )
         .await?;
-
+    dbg!("GGGASSSS: {:?}", gas_info.clone());
     let (message_id, program_id, _hash) = api
         .upload_program_bytes(
             gclient::code_from_os(MT_MAIN_WASM_PATH)?,
             gclient::now_micros().to_le_bytes(),
             init_mtoken_config,
-            gas_info.min_limit * 5,
+            gas_info.min_limit,
             0,
         )
         .await?;
     assert!(listener.message_processed(message_id).await?.succeed());
-
     let program_id: Hash = program_id
         .encode()
         .try_into()
@@ -99,16 +98,7 @@ pub async fn upload_with_code_hash(
 
     match api.upload_code(wasm_code).await {
         // Catch re-upload
-        Err(gclient::Error::Subxt(subxt::Error::Runtime(subxt::error::DispatchError::Module(
-            subxt::error::ModuleError {
-                error_data:
-                    subxt::error::ModuleErrorData {
-                        pallet_index: 104,
-                        error: [6, 0, 0, 0],
-                    },
-                ..
-            },
-        )))) => {}
+        Err(GclientError::ProgramAlreadyExists(_)) => {}
         Err(error) => return Err(error),
         _ => {}
     };

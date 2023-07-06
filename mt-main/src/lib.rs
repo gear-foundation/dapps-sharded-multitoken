@@ -75,6 +75,7 @@ impl MToken {
                 payload: payload.to_vec(),
             },
             0,
+            0,
         )
         .expect("Error in sending a message to the multitoken logic contract.")
         .await;
@@ -92,6 +93,7 @@ impl MToken {
                 token_id,
                 account: *account,
             },
+            0,
             0,
         )
         .expect("Error in sending a message `MTLogicAction::GetBalance`.")
@@ -111,6 +113,7 @@ impl MToken {
                 account: *account,
                 approval_target: *approval_target,
             },
+            0,
             0,
         )
         .expect("Error in sending a message `MTLogicAction::GetApproval`.")
@@ -219,12 +222,6 @@ extern "C" fn state() {
     };
 
     msg::reply(token_state, 0).expect("Failed to share state.");
-}
-
-#[no_mangle]
-extern "C" fn metahash() {
-    let metahash: [u8; 32] = include!("../.metahash");
-    msg::reply(metahash, 0).expect("Failed to share metahash.");
 }
 
 fn reply_ok() {
