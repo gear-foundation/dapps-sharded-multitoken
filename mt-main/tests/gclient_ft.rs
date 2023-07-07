@@ -14,6 +14,7 @@ async fn success_create_ft_gclient() -> gclient::Result<()> {
     let initial_amount = 1000000;
 
     let api = api.with(USER_ACCOUNTS[0])?;
+
     let mut listener = api.subscribe().await?;
     let user_account_0 = ActorId::new(api.account_id().clone().into());
     let token_id: TokenId = 1 << (mem::size_of::<TokenId>() * 8 / 2);
@@ -27,6 +28,7 @@ async fn success_create_ft_gclient() -> gclient::Result<()> {
         false,
     )
     .await?;
+
     assert_eq!(
         mtoken_get_balance(&api, &mut listener, &program_id, token_id, user_account_0).await?,
         initial_amount
@@ -47,6 +49,7 @@ async fn success_create_ft_gclient() -> gclient::Result<()> {
         false,
     )
     .await?;
+
     assert_eq!(
         mtoken_get_balance(&api, &mut listener, &program_id, token_id, user_account_1).await?,
         initial_amount * 2
@@ -66,6 +69,7 @@ async fn success_create_ft_gclient() -> gclient::Result<()> {
         false,
     )
     .await?;
+
     assert_eq!(
         mtoken_get_balance(&api, &mut listener, &program_id, token_id, user_account_0).await?,
         initial_amount / 10000

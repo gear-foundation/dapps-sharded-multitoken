@@ -14,6 +14,7 @@ pub async fn get_balance(
             account: *account,
         },
         0,
+        0,
     )
     .expect("Error in sending a message `MTStorageAction::GetBalance`.")
     .await;
@@ -38,6 +39,7 @@ pub async fn get_approval(
             account: *account,
             approval_target: *approval_target,
         },
+        0,
         0,
     )
     .expect("Error in sending a message `MTStorageAction::GetApproval`.")
@@ -72,6 +74,7 @@ pub async fn transfer(
             amount,
         },
         0,
+        0,
     )
     .expect("Error in sending a message `MTStorageAction::Transfer`.")
     .await;
@@ -100,6 +103,7 @@ pub async fn approve(
             account: *account,
             approve,
         },
+        0,
         0,
     )
     .expect("Error in sending a message `MTStorageAction::Approve`.")
@@ -130,6 +134,7 @@ pub async fn increase_balance(
             account: *account,
             amount,
         },
+        0,
         0,
     )
     .expect("Error in sending a message `MTStorageAction::IncreaseBalance`.")
@@ -162,6 +167,7 @@ pub async fn decrease_balance(
             account: *account,
             amount,
         },
+        0,
         0,
     )
     .expect("Error in sending a message `MTStorageAction::DecreaseBalance`.")
