@@ -1,4 +1,4 @@
-.PHONY: all build fmt init lint pre-commit test full-test deps
+.PHONY: all build fmt init lint pre-commit test full-test
 
 all: init build test
 
@@ -27,4 +27,4 @@ test:
 
 full-test:
 	@echo ⚙️ Running all tests...
-	@cargo t -- --include-ignored --test-threads=1
+	@cargo t -- --include-ignored

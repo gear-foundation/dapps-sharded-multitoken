@@ -10,8 +10,8 @@ gstd.workspace = true
 mt-logic-io.workspace = true
 mt-storage-io.workspace = true
 mt-main-io.workspace = true
-primitive-types = { workspace = true, features = ["scale-info"] }
-hex = { workspace = true, features = ["alloc"] }
+primitive-types.workspace = true
+hex.workspace = true
 hashbrown.workspace = true
 
 [dev-dependencies]
@@ -25,9 +25,4 @@ mt-logic-io.workspace = true
 gear-wasm-builder.workspace = true
 
 [features]
-# Used for inserting constants with WASM binaries (NOT paths) of the contract in
-# the root crate. Usually these constants used in gclient tests instead of
-# strings with paths to the binaries in the "target" directory. If you don't
-# like this approach or don't use gclient tests, you can freely remove this
-# feature from here and from the rest of the code.
 binary-vendor = []
