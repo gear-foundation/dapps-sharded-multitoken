@@ -57,7 +57,7 @@ pub async fn setup_gclient() -> gclient::Result<(GearApi, ActorId)> {
             gclient::code_from_os(MT_MAIN_WASM_PATH)?,
             gclient::now_micros().to_le_bytes(),
             init_mtoken_config,
-            gas_info.min_limit*5,
+            gas_info.min_limit * 5,
             0,
         )
         .await?;
